@@ -47,7 +47,7 @@ attack = DPatch(
     # (height, width, nb_channels)
     patch_shape=(100, 100, 3),
     # Number of optimization steps
-    max_iter=5
+    max_iter=100
 )
 
 # GoogleDrive Mount
@@ -82,7 +82,7 @@ def extract_predictions(predictions):
     predictions_score = list(predictions[0]["scores"])
 
     # Get a list of index with score greater than threshold
-    threshold = 0.6
+    threshold = 0.3
     predictions_t = [predictions_score.index(x) for x in predictions_score if x > threshold][-1]
 
     # Trim the predictions to include only the high-scoring objects
@@ -109,3 +109,44 @@ with Image.open(image_path).convert('RGB').resize((640, 640)) as image:
     adversarial_image = Image.fromarray(np.squeeze(adversarial_image.astype(np.uint8)))
     # Display adversarial image
     adversarial_image.show()
+
+print("original_predictions: ", original_predictions)
+print("adversarial_predictions: ", adversarial_predictions)
+
+def calculate_ap(predictions):
+    # Sort the predictions by score in descending order
+    sorted_predictions = sorted(predictions[2], reverse=True)
+
+    # Initialize variables
+    true_positives = 0
+    false_positives = 0
+    precision = []
+    recall = []
+
+    # Calculate precision and recall at each threshold
+    for prediction in sorted_predictions:
+        if prediction in predictions[2]:
+            true_positives += 1
+        else:
+            false_positives += 1
+        precision.append(true_positives / (true_positives + false_positives))
+        recall.append(true_positives / len(predictions[2]))
+
+    # Calculate Average Precision
+    ap = sum(precision[i] * (recall[i] - recall[i - 1]) for i in range(1, len(precision)))
+
+    return ap
+
+# Calculate AP for original predictions
+original_ap = calculate_ap(original_predictions)
+print("AP for original predictions = ", original_ap)
+
+# Calculate AP for adversarial predictions
+adversarial_ap = calculate_ap(adversarial_predictions)
+print("AP for adversarial predictions = ", adversarial_ap)
+
+# Compare the AP values
+if original_ap != adversarial_ap:
+    print("The DPatch attack had an impact on the Average Precision.")
+else:
+    print("The DPatch attack has not significantly affected the Average Precision.")
